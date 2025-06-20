@@ -1,5 +1,23 @@
 # Super Resolution GAN Training Repository
 
+<div align="center">
+<table>
+  <tr>
+    <td align="center">
+      <img src="assets/1.png" width="250"><br>
+    </td>
+    <td align="center">
+      <img src="assets/2.png" width="250"><br>
+    </td>
+    <td align="center">
+      <img src="assets/3.png" width="250"><br>
+    </td>
+    <td align="center">
+      <img src="assets/4.png" width="250"><br>
+    </td>
+  </tr> 
+</table>
+</div>
 
 ## 1. Dependencies and Installation
 
@@ -87,6 +105,9 @@ discriminator:
             num_feat: 64
             ckpt: #"/model_zoo/RealESRGAN_x4plus_netD.pth" --> in case you want to resume a training, pretrainned l2 weights are recomended
 ```
+
+For training: ```python run_sr.py --device 0 (or the one you want to train in) --config /config/esrgan.yml --test /config/test.yml --name esrgan```
+
 ## 3. GAN Validation
 
 Every ```log_freq``` epochs the validation of the GAN is conducted on 2 types of datsets which you can control from the ```config/test.yml```:
