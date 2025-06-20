@@ -1,0 +1,10 @@
+test:
+    - DIV2K_LSDIR:
+        hr: "/scratch/cidaut_tic_1/cidaut_tic_1_7/Datasets/DIV2K_LSDIR/GT/validation"
+        lr: "/scratch/cidaut_tic_1/cidaut_tic_1_7/Datasets/DIV2K_LSDIR/bicubic/validation"
+        n: 200
+        scale: 4
+
+    - RealSR:
+        lr: "/scratch/cidaut_tic_1/cidaut_tic_1_7/Datasets/RealSR_validation"
+        n: 20
