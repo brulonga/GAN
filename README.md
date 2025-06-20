@@ -28,12 +28,12 @@
 
 ```
 # git clone this repository
-git clone https://github.com/brulonga/SRB-CoupledLatents.git
-cd SRB-CoupledLatents
+git clone https://github.com/brulonga/GAN.git
+cd GAN
 
 # create python environment
-python3 -m venv venv_CoupledLatents
-source venv_CoupledLatents/bin/activate
+python3 -m venv venv_GAN
+source venv_GAN/bin/activate
 
 # install python dependencies
 pip install -r requirements.txt
