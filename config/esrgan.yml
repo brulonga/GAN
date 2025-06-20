@@ -1,39 +1,39 @@
 wandb:
     use: True
-    project: "ESRGAN"
-    entity : "cidautai"
-    tags   : ["sr"]
+    project: ""
+    entity : ""
+    tags   : 
 
 training:
     only_l2: True
-    batch_size: 3
-    epochs: 1000
-    n_iters: 5000000
-    log_freq: 20
-    lpips_weight: 1.0
-    gan_weight_max: 1.0
-    t0: 500
-    k: 0.1
+    batch_size: 
+    epochs: 
+    n_iters: 
+    log_freq: 
+    lpips_weight:
+    gan_weight_max:
+    t0:
+    k:
 
 optim:
-    weight_decay: 0.01
+    weight_decay: 
     optimizer: "AdamW"
-    lr: 0.0001
-    lr_discriminator: 0.000005
-    beta1: 0.9
+    lr: 
+    lr_discriminator: 
+    beta1: 
     amsgrad: True
-    eps: 0.00000001
-    grad_clip: 1.0
+    eps: 
+    grad_clip: 
 
 data:
-    number_deg: 1
-    crop_size: 512
-    scale: 4
+    number_deg:
+    crop_size:
+    scale: 
     channels: 3
     debug: -1 # -1 No debugging, N number of debugging samples
     num_workers: 8
     ssl_datasets: [
-                    "/scratch/cidaut_tic_1/cidaut_tic_1_7/Datasets/DIV2K/GT/train",
+                    "",
                     ]
 
 generator:
@@ -47,7 +47,7 @@ generator:
             scale: 4
             num_intermediate_ch: 32
             num_blocks: 23
-            ckpt: #"/home/brulon/Documents/ESRGAN/model_zoo/RealESRGAN_x4plus.pth"
+            ckpt: #"/model_zoo/RealESRGAN_x4plus.pth"
 
 discriminator:
     pick : 0
@@ -56,4 +56,4 @@ discriminator:
             model: "discriminator"
             in_ch: 3
             num_feat: 64
-            ckpt: #"/home/brulon/Documents/ESRGAN/model_zoo/RealESRGAN_x4plus_netD.pth"
+            ckpt: #"/model_zoo/RealESRGAN_x4plus_netD.pth"
