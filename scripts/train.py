@@ -15,8 +15,8 @@ from utils.loss import GeneratorLoss, DiscriminatorLoss, ExponentialMovingAverag
 def test_model(model, testsets, device, use_wandb, ema):
 
     print ("Testing model ...")
-    model.eval()
 
+    model.eval()
     ema.apply_shadow()
 
     with torch.no_grad():
@@ -29,7 +29,6 @@ def test_model(model, testsets, device, use_wandb, ema):
             if testset_name == 'DIV2K_LSDIR':
 
                 psnr_rgb   = [] ; ssim_rgb = []
-                #psnr_y = [] ; ssim_y = []
 
                 for idx, batch in enumerate(test_dataloader):
 
@@ -45,11 +44,8 @@ def test_model(model, testsets, device, use_wandb, ema):
 
                     psnr_rgb.append(torch.mean(pt_psnr(x, x_hat)).item())
                     ssim_rgb.append(ssim(x, x_hat, data_range=1., size_average=True).item())
-                    #psnr_y.append (get_psnry(x, x_hat).item())
-                    #ssim_y.append (get_ssimy(x, x_hat).item())
 
                     if idx==0:
-                        # Plot only the first image of each test set
                         bi = 0
                         _y    = np.clip(y[bi].permute(1,2,0).cpu().detach().numpy(), 0, 1).astype(np.float32)
                         _x_hat= np.clip(x_hat[bi].permute(1,2,0).cpu().detach().numpy(), 0, 1).astype(np.float32)
@@ -60,12 +56,9 @@ def test_model(model, testsets, device, use_wandb, ema):
 
                         del _x, _y,_x_hat; gc.collect()
 
-                ## Log the test metrics:
                 if use_wandb:
                     wandb.log({f"{testset_name}_{testset.scale}_psnr": np.mean(psnr_rgb)})
                     wandb.log({f"{testset_name}_{testset.scale}_ssim": np.mean(ssim_rgb)})
-                    #wandb.log({f"{testset_name}_{testset.scale}_PSNR-Y": np.mean(psnr_y)})
-                    #wandb.log({f"{testset_name}_{testset.scale}_SSIM-Y": np.mean(ssim_y)})
 
                 del test_dataloader; gc.collect()
 
@@ -83,7 +76,7 @@ def test_model(model, testsets, device, use_wandb, ema):
                     niqe_list.append(niqe)
 
                     if idx==0:
-                            # Plot only the first image of each test set
+            
                             bi = 0
                             _y    = np.clip(y[bi].permute(1,2,0).cpu().detach().numpy(), 0, 1).astype(np.float32)
                             _x_hat= np.clip(x_hat[bi].permute(1,2,0).cpu().detach().numpy(), 0, 1).astype(np.float32)
@@ -93,7 +86,6 @@ def test_model(model, testsets, device, use_wandb, ema):
 
                             del _y,_x_hat; gc.collect()
 
-                ## Log the test metrics:
                 if use_wandb:
                     wandb.log({f"{testset_name}_niqe": np.mean(niqe_list)})
 
@@ -102,27 +94,24 @@ def test_model(model, testsets, device, use_wandb, ema):
     ema.restore()
 
 def fit_sr (generator, discriminator, optimizerG, optimizerD, dataloader, device, testsets=None, use_wandb=True, use_amp=True, epochs=100, 
-                  verbose=10, modelname="testmodel", out_path="results/", start_epoch=0, ema_flag = True, clip_value = 1.0, lpips_weight = 1.0, 
-                  gan_weight_max = 1.0, k = 0.1, t0= 500):
+                  verbose=10, modelname="testmodel", out_path="results/", start_epoch=0, ema_flag = True, clip_value = 1.0, lpips_weight = 1.0, gan_weight_max = 1.0,
+                  schedulerG = None, end_epoch= 1000, annealing = False):
 
     steps=0
     use_amp=use_amp
-    nan_batches = 0  # Track NaN batches
+    nan_batches = 0 
 
     ema = ExponentialMovingAverage(generator, decay=0.999)
 
-    loss_g = GeneratorLoss(lpips_weight= lpips_weight, gan_weight_max=gan_weight_max, k=k, t0=t0)
+    loss_g = GeneratorLoss(lpips_weight= lpips_weight, gan_weight_max=gan_weight_max, end_epoch=end_epoch, start_epoch=start_epoch)
     loss_d = DiscriminatorLoss(discriminator=discriminator)
 
     if not os.path.exists(out_path):
         os.makedirs(out_path)
 
-    #By the moment no lr scheduler
-    #scheduler =torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=0.004, epochs=100, div_factor=10, final_div_factor=4000)
-    #scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs, eta_min=1e-5)
     scaler = torch.amp.GradScaler(enabled=use_amp)
 
-    for epoch in tqdm(range(start_epoch, start_epoch+epochs), total=start_epoch+epochs):
+    for epoch in tqdm(range(start_epoch, start_epoch + epochs), total=start_epoch + epochs):
 
         generator.train()
         discriminator.train()
@@ -132,119 +121,67 @@ def fit_sr (generator, discriminator, optimizerG, optimizerD, dataloader, device
             x = batch[0].to(device, non_blocking=True)
             y = batch[1].to(device, non_blocking=True)
 
-            ########## GENERAR x_hat ##########
             with torch.amp.autocast(device_type='cuda', enabled=use_amp):
                 x_hat = generator(y)['img']
 
-            # Detectar NaNs/Infs en la salida antes de cualquier cálculo de loss
             if torch.isnan(x_hat).any() or torch.isinf(x_hat).any():
-                print(f"x_hat contiene NaN o Inf en step {steps}, batch saltado")
+                print(f"x_hat had NaN or Inf in step {steps}, skipt batch")
                 nan_batches += 1
-                continue  # saltar esta iteración completa (no update D ni G)
-
-            ########## DISCRIMINATOR UPDATE ##########
-            with torch.amp.autocast(device_type='cuda', enabled=use_amp):
-                for param in discriminator.parameters():
-                    param.requires_grad = True
-
-                optimizerD.zero_grad(set_to_none=True)
-
-                x_hat_detached = x_hat.detach()
-
-                loss_disc, loss_d_fake, loss_d_real = loss_d(x_hat_detached, x)
-
-            # prev_params = {}
-
-            # for name, param in discriminator.named_parameters():
-            #     if param.requires_grad:
-            #         prev_params[name] = param.clone().detach()           
-
-            if use_amp:
-
-                scaler.scale(loss_disc).backward()
-                torch.nn.utils.clip_grad_value_(discriminator.parameters(), clip_value)  
-                scaler.step(optimizerD)  # Update discriminator weights
-                scaler.update()  # Update the scaler
-
-            else:
-
-                loss_disc.backward()
-
-                # def print_gradients(model):
-                #     for name, param in model.named_parameters():
-                #         if param.grad is not None:
-                #             grad_norm = param.grad.data.norm(2)
-                #             if torch.isnan(grad_norm) or torch.isinf(grad_norm):
-                #                 print(f"[!] {name}: gradiente NaN o Inf detectado")
-                #             else:
-                #                 print(f"{name}: grad norm = {grad_norm:.4f}")
-                #         else:
-                #             print(f"{name}: No tiene gradiente")
-
-                # # Ejemplo, después de loss.backward():
-
-                # print_gradients(discriminator)
-
-                torch.nn.utils.clip_grad_value_(discriminator.parameters(), clip_value)
-                optimizerD.step()  
-
-            # for name, param in discriminator.named_parameters():
-            #     if param.requires_grad:
-            #         # Calcular la diferencia entre el parámetro anterior y el actual
-            #         diff = (param - prev_params[name]).abs().sum()
-            #         print(f"{name}: cambio total = {diff.item():.6f}")
-
-            ########## GENERATOR UPDATE ##########
+                continue
 
             with torch.amp.autocast(device_type='cuda', enabled=use_amp):
-                
+
                 for param in discriminator.parameters():
                     param.requires_grad = False
 
                 optimizerG.zero_grad(set_to_none=True)
+                fake_pred_disc_for_gen = discriminator(x_hat)['out']
+                loss_gen, dict_losses = loss_g(x_hat, x, fake_pred_disc_for_gen, epoch, annealing=annealing)
 
-                fake_pred_disc = discriminator(x_hat)['out']
-                loss_gen, dict_losses = loss_g(x_hat, x, fake_pred_disc, epoch)
-                            
-                #psnr_loss = torch.mean(pt_psnr(x, x_hat))
-                #ssim_loss = ssim(x, x_hat, data_range=1., size_average=True)
-                #psnry_loss= get_psnry(x, x_hat)
-                #ssimy_loss= get_ssimy(x, x_hat)
-                
-            if use_amp:
-
-                scaler.scale(loss_gen).backward() 
-                torch.nn.utils.clip_grad_value_(generator.parameters(), clip_value)
-                scaler.step(optimizerG)  # Update generator weights
-                scaler.update()  # Update the scaler for the next iteration
+                if use_amp:
+                    scaler.scale(loss_gen.mean()).backward()
+                    scaler.unscale_(optimizerG)
+                    torch.nn.utils.clip_grad_value_(generator.parameters(), clip_value)
+                    scaler.step(optimizerG)
+                else:
+                    loss_gen.mean().backward()
+                    torch.nn.utils.clip_grad_value_(generator.parameters(), clip_value)
+                    optimizerG.step()
 
                 if ema_flag:
                     ema.update()
 
-            else:
+                for param in discriminator.parameters():
+                    param.requires_grad = True
 
-                loss_gen.backward()
-                torch.nn.utils.clip_grad_value_(generator.parameters(), clip_value)
-                optimizerG.step()  
+                optimizerD.zero_grad(set_to_none=True)
+                x_hat_detached = x_hat.detach()
+                fake_pred_disc_for_disc = discriminator(x_hat_detached)['out']
+                loss_disc, loss_d_fake, loss_d_real = loss_d(fake_pred_disc_for_disc, x)
 
-                if ema_flag:
-                    ema.update()
+                if use_amp:
+                    scaler.scale(loss_disc.mean()).backward()
+                    scaler.unscale_(optimizerD)
+                    torch.nn.utils.clip_grad_value_(discriminator.parameters(), clip_value)
+                    scaler.step(optimizerD)
+                    scaler.update()
+                else:
+                    loss_disc.mean().backward()
+                    torch.nn.utils.clip_grad_value_(discriminator.parameters(), clip_value)
+                    optimizerD.step()
 
-            steps+=1
+            steps += 1
+
             if use_wandb:
-                #wandb.log({"psnr": psnr_loss.item()})
-                wandb.log({"lossG": loss_gen.item()})
-                wandb.log({"lossD": loss_disc.item()})
-                #wandb.log({"ssim": ssim_loss.item()})
+                wandb.log({"lossG": loss_gen.mean().item()})
+                wandb.log({"lossD": loss_disc.mean().item()})
                 wandb.log({"LPIPS": dict_losses['lpips']})
                 wandb.log({"GANLoss": dict_losses['gan']})
                 wandb.log({"l1": dict_losses['l1']})
-                #wandb.log({"psnr-y": psnry_loss.item()})
-                #wandb.log({"ssim-y": ssimy_loss.item()})
-                wandb.log({"Fake_disc_loss": loss_d_fake.item()})
-                wandb.log({"Real_disc_loss": loss_d_real.item()})
+                wandb.log({"Fake_disc_loss": loss_d_fake.mean().item()})
+                wandb.log({"Real_disc_loss": loss_d_real.mean().item()})
             
-        #scheduler.step()
+        schedulerG.step()
 
         if nan_batches >= 10: 
             print ("Training collapses")
@@ -252,7 +189,7 @@ def fit_sr (generator, discriminator, optimizerG, optimizerD, dataloader, device
 
         if (epoch % verbose)==0:
             
-            print (f"\n >> Epoch {epoch} / {start_epoch+epochs}", 'LossG', loss_gen.item(), 'LossD', loss_disc.item(), "Steps", steps)
+            print (f"\n >> Epoch {epoch} / {start_epoch+epochs}", 'LossG', loss_gen.mean().item(), 'LossD', loss_disc.mean().item(), "Steps", steps)
             print ("model saved at ", os.path.join(out_path, f"{modelname}.pt"))
 
             for bi in range(3):
@@ -265,42 +202,10 @@ def fit_sr (generator, discriminator, optimizerG, optimizerD, dataloader, device
 
                 del _x, _y,_x_hat; gc.collect()
             
-            print('Epoca completada')
+            print('Epoch completed')
 
-            ##### Evaluate model
             test_model(generator, testsets, device, use_wandb, ema)
-
-            ##### Save Model
-            torch.save(generator.state_dict(), os.path.join(out_path, f"{modelname}_{epoch}.pt"))
-            torch.save(discriminator.state_dict(), os.path.join(out_path, f"{modelname}_{epoch}_discriminator.pt"))
+            torch.save(generator.state_dict(), os.path.join(out_path, f"{modelname}.pt"))
+            torch.save(discriminator.state_dict(), os.path.join(out_path, f"{modelname}_discriminator.pt"))
             
             gc.collect()
-        
-        #torch.save(model.state_dict(), os.path.join(out_path, f"{modelname}_{epoch}.pt"))
-
-    # torch.save(generator.state_dict(), os.path.join(out_path, f"{modelname}_last.pt"))
-    # torch.save(discriminator.state_dict(), os.path.join(out_path, f"{modelname}_discriminator_last.pt"))
-
-                # Handle NaN or Inf Loss
-                # if torch.isnan(loss_d) or torch.isinf(loss_d):
-                #     nan_batches += 1  # Track NaN batches
-                #     print(f"⚠️ Skipping step due to unstable discriminator loss: {loss_d.item()}")
-                #     continue 
-
-                # # Handle NaN or Inf Loss
-                # if torch.isnan(loss_g) or torch.isinf(loss_g):
-                #     nan_batches += 1  # Track NaN batches
-                #     print(f"⚠️ Skipping step due to unstable generator loss: {loss_g.item()}")
-                #     continue 
-
-                # for name, param in generator.named_parameters():
-                #     if param.grad is not None:
-                #         if torch.isnan(param.grad).any() or torch.isinf(param.grad).any():
-                #             print(f"⚠️ NaN or Inf detected in gradient of {name}!")
-                #             continue
-
-                # for name, param in discriminator.named_parameters():
-                #     if param.grad is not None:
-                #         if torch.isnan(param.grad).any() or torch.isinf(param.grad).any():
-                #             print(f"⚠️ NaN or Inf detected in gradient of {name}!")
-                #             continue

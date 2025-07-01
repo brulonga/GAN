@@ -6,12 +6,15 @@ from glob import glob
 import wandb
 import argparse
 from datetime import datetime
+import numpy as np
+import random
 
 
 from utils.utils import dict2namespace, seed_everything
 from data.datasets import SSLSRImage, SRSSLDTS, SRSUPDTS, SRNRIQADTS
 from scripts.train import fit_sr
 from scripts.train_l2 import fit_sr_l2
+from basicsr.utils import DiffJPEG, USMSharp
 
 if __name__=="__main__":
 
@@ -38,11 +41,15 @@ if __name__=="__main__":
     torch.cuda.set_device(f'cuda:{GPU}')
     device = torch.device(f'cuda:{GPU}' if torch.cuda.is_available() else "cpu")
 
-    # parse config file
     with open(os.path.join(args.config), "r") as f:
         config = yaml.safe_load(f)
 
-    cfg = dict2namespace(config)   
+    cfg = dict2namespace(config)
+
+    with open(os.path.join("config/degradations.yml"), "r") as f:
+        config_deg = yaml.safe_load(f)  
+
+    cfg_deg = dict2namespace(config_deg) 
 
     ################### WANDB LOG
 
@@ -73,12 +80,25 @@ if __name__=="__main__":
 
     print ("All images SSL", len(SSL_DATASET))
 
+    jpeger = DiffJPEG(differentiable=False)
+    usm_sharp = USMSharp()
+
     dataset    = SSLSRImage(hq_img_paths=SSL_DATASET,
                          resize='bicubic', size=cfg.data.crop_size, scale=cfg.data.scale,
-                         degpipe=None, augmentations=True, logdeg=False)
+                         degpipe=None, augmentations=True, logdeg=False, cfg_deg=cfg_deg, jpeger=jpeger,
+                         sharp=cfg.training.sharp, usm_sharp=usm_sharp)
+    
+    def seed_worker(worker_id):
+        worker_seed = torch.initial_seed() % (2**32)
+        np.random.seed(worker_seed)
+        random.seed(worker_seed)
+
+    g = torch.Generator()
+    g.manual_seed(42)
     
     dataloader = DataLoader(dataset, batch_size=cfg.training.batch_size, num_workers=cfg.data.num_workers, 
-                            drop_last=True, pin_memory=True, shuffle=True)
+                            drop_last=True, pin_memory=True, shuffle=True, worker_init_fn=seed_worker,
+                            generator=g)
     
     ################### TESTING DATASET
 
@@ -136,8 +156,10 @@ if __name__=="__main__":
     discriminator_config = cfg.discriminator.models[cfg.discriminator.pick]
     discriminator = make_discriminator(discriminator_config, device)
 
-    optimizerD = torch.optim.AdamW(filter(lambda p: p.requires_grad, discriminator.parameters()), lr=cfg.optim.lr_discriminator, weight_decay=cfg.optim.weight_decay, betas=(cfg.optim.beta1, 0.999))
-    optimizerG = torch.optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr=cfg.optim.lr, weight_decay=cfg.optim.weight_decay, betas=(cfg.optim.beta1, 0.999))
+    optimizerD = torch.optim.AdamW(filter(lambda p: p.requires_grad, discriminator.parameters()), lr=cfg.optim.lr_discriminator, weight_decay=cfg.optim.weight_decay)
+    optimizerG = torch.optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr=cfg.optim.lr, weight_decay=cfg.optim.weight_decay)
+
+    schedulerG = torch.optim.lr_scheduler.CosineAnnealingLR(optimizerG, T_max=cfg.optim.T_max ,eta_min=cfg.optim.eta_min)
 
     torch.cuda.empty_cache()
     torch.cuda.reset_peak_memory_stats()
@@ -161,7 +183,7 @@ if __name__=="__main__":
 
         if cfg.training.only_l2:
 
-            fit_sr_l2(model, optimizerG, dataloader, device, test_datasets, use_wandb=USE_WANDB, use_amp=cfg.optim.amsgrad, epochs=cfg.training.epochs,
+            fit_sr_l2(model, optimizerG, schedulerG, dataloader, device, test_datasets, use_wandb=USE_WANDB, use_amp=cfg.optim.amsgrad, epochs=cfg.training.epochs,
                     verbose=cfg.training.log_freq, modelname=MODEL_NAME, out_path=f"./results/{MODEL_NAME}/", clip_value=cfg.optim.grad_clip,
                     )
 
@@ -170,7 +192,8 @@ if __name__=="__main__":
             fit_sr (model, discriminator, optimizerG, optimizerD, dataloader, testsets=test_datasets, device=device, use_wandb=USE_WANDB, 
                 epochs=cfg.training.epochs, verbose=cfg.training.log_freq, use_amp=cfg.optim.amsgrad,
                 modelname=MODEL_NAME, out_path=f"./results/{MODEL_NAME}/", clip_value = cfg.optim.grad_clip, lpips_weight=cfg.training.lpips_weight,
-                gan_weight_max=cfg.training.gan_weight_max,
+                gan_weight_max=cfg.training.gan_weight_max, schedulerG = schedulerG, start_epoch=cfg.training.start_epoch, end_epoch= cfg.training.end_epoch,
+                annealing=cfg.training.annealing,
                 )
 
         if USE_WANDB:

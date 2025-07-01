@@ -6,7 +6,8 @@ import numpy as np
 import torch.nn.functional as F
 from torch.utils.data import Dataset
 from utils.utils import load_img
-import utils.degradations as degradation
+import utils.deg as degradation
+from utils.utils import dict2namespace
 
 class SSLSRImage(Dataset):
     """
@@ -18,7 +19,7 @@ class SSLSRImage(Dataset):
     """
 
     def __init__(self, hq_img_paths, size=512, resize="bicubic", logdeg=False, degpipe=0, 
-                        scale=2, augmentations=True, sample=-1):
+                        scale=2, augmentations=True, sample=-1, cfg_deg= None, jpeger = None, usm_sharp = None, sharp= False):
 
         self.img_paths = hq_img_paths
         self.totensor  = torchvision.transforms.ToTensor()
@@ -28,6 +29,10 @@ class SSLSRImage(Dataset):
         self.degpipe   = degpipe
         self.augs      = augmentations
         self.scale     = scale
+        self.cfg_deg   = cfg_deg
+        self.jpeger    = jpeger
+        self.sharp     = sharp
+        self.usm_sharp = usm_sharp
 
         if sample > 0:
             self.img_paths = self.img_paths[:sample]
@@ -58,9 +63,20 @@ class SSLSRImage(Dataset):
                 image     = torchvision.transforms.functional.vflip(image)
 
         if self.degpipe == 1:
-            deg_image = degradation.degradation_pipeline_1(image, self.scale)
-        elif self.degpipe == 2:
-            deg_image = degradation.degradation_pipeline_2(image, self.scale)
+            deg_image = degradation.degradation_pipeline_real_esrgan(img=image, scale=self.scale, kernel_size1=self.cfg_deg.blur_kernel_size, 
+                        kernel_list1=self.cfg_deg.kernel_list, kernel_prob1=self.cfg_deg.kernel_prob, sigma_range1=self.cfg_deg.blur_sigma,
+                        betag_range1=self.cfg_deg.betag_range, betap_range1=self.cfg_deg.betap_range, sinc_prob1=self.cfg_deg.sinc_prob,
+                        resize_prob1=self.cfg_deg.resize_prob, resize_range=self.cfg_deg.resize_range, gaussian_noise_prob=self.cfg_deg.gaussian_noise_prob,
+                        noise_range_gauss1=self.cfg_deg.noise_range, noise_range_poisson1=self.cfg_deg.poisson_scale_range, 
+                        gray_noise_prob=self.cfg_deg.gray_noise_prob, jpeg_range1=self.cfg_deg.jpeg_range,
+                        second_blur_prob=self.cfg_deg.second_blur_prob, kernel_size2=self.cfg_deg.blur_kernel_size2, kernel_list2=self.cfg_deg.kernel_list2,
+                        kernel_prob2=self.cfg_deg.kernel_prob2, sigma_range2=self.cfg_deg.blur_sigma2, betag_range2=self.cfg_deg.betag_range2,
+                        betap_range2=self.cfg_deg.betap_range2, sinc_prob2=self.cfg_deg.sinc_prob2, resize_prob2=self.cfg_deg.resize_prob2, 
+                        resize_range2=self.cfg_deg.resize_range2, gaussian_noise_prob2=self.cfg_deg.gaussian_noise_prob,
+                        noise_range_gauss2=self.cfg_deg.noise_range2, noise_range_poisson2=self.cfg_deg.poisson_scale_range2, 
+                        gray_noise_prob2=self.cfg_deg.gray_noise_prob2, jpeg_range2=self.cfg_deg.jpeg_range2, 
+                        final_sinc_prob=self.cfg_deg.final_sinc_prob, jpeger=self.jpeger,
+                        )
         else:
             deg_image = torch.nn.functional.interpolate(image.unsqueeze(0), scale_factor=1/self.scale, mode="bicubic", antialias=True).squeeze(0)
 
@@ -70,6 +86,10 @@ class SSLSRImage(Dataset):
 
         assert not torch.isnan(image).any(), f"NaN in image {img_path}"
         assert not torch.isnan(deg_image).any(), f"NaN in deg_image {img_path}"
+
+        if self.sharp:
+
+            image = self.usm_sharp(image)
 
         image = torch.clamp(image, 0., 1.)
         deg_image = torch.clamp(deg_image, 0., 1.)

@@ -1,41 +1,42 @@
 wandb:
     use: True
-    project: ""
-    entity : ""
-    tags   : 
+    project: "ESRGAN"
+    entity : "cidautai"
+    tags   : ["sr"]
 
 training:
-    only_l2: True
-    batch_size: 
-    epochs: 
-    n_iters: 
-    log_freq: 
-    lpips_weight:
-    gan_weight_max:
-    t0:
-    k:
+    only_l2: False
+    batch_size: 16
+    epochs: 1000
+    log_freq: 20
+    lpips_weight: 1.0
+    gan_weight_max: 0.1
+    annealing: True
+    start_epoch: 5
+    end_epoch: 10
+    sharp: False
 
 optim:
-    weight_decay: 
+    weight_decay: 0.001
     optimizer: "AdamW"
-    lr: 
-    lr_discriminator: 
-    beta1: 
+    lr: 0.0002
+    T_max: 52500
+    eta_min: 0.0000001
+    lr_discriminator: 0.00005
     amsgrad: True
-    eps: 
-    grad_clip: 
+    eps: 0.00000001
+    grad_clip: 1.0
 
 data:
-    number_deg:
-    crop_size:
-    scale: 
+    number_deg: 1
+    crop_size: 256
+    scale: 4
     channels: 3
     debug: -1 # -1 No debugging, N number of debugging samples
-    num_workers: 8
+    num_workers: 18
     ssl_datasets: [
-                    "",
+                    "/mnt/valab-datasets/SuperRes_datasets/PSNR_DATASETS/DIV2K/GT/train"
                     ]
-
 generator:
     pick : 0
     models:
@@ -47,7 +48,7 @@ generator:
             scale: 4
             num_intermediate_ch: 32
             num_blocks: 23
-            ckpt: #"/model_zoo/RealESRGAN_x4plus.pth"
+            ckpt: "/home/brulon/Documents/ESRGAN/model_zoo/esrgan_l2.pt"
 
 discriminator:
     pick : 0
@@ -56,4 +57,4 @@ discriminator:
             model: "discriminator"
             in_ch: 3
             num_feat: 64
-            ckpt: #"/model_zoo/RealESRGAN_x4plus_netD.pth"
+            ckpt: #"/scratch/cidaut_tic_1/cidaut_tic_1_7/Repositories/GAN/results/esrgan_161020/esrgan_161020_discriminator.pt"

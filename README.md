@@ -55,12 +55,13 @@ training:
     only_l2: False --> in case you want to train only l2 loss without Gan or perceptual loss (first training stage)
     batch_size:  
     epochs: 
-    n_iters:
     log_freq: --> frequency os validation (epochs)
     lpips_weight: --> weight of the perceptual loss (LPIPS) 
     gan_weight_max: --> max weight thta reaches the GAN Loss after the annealing
-    t0: --> epoch at which it reaches the half of the maximum gan weight 
-    k: 0.1/0.3 --> param to control the stepness of the gan weight annealing
+    annealing: True --> flag if you want to use Gan weight annealing
+    start_epoch: --> start epoch for the annealing
+    end_epoch: --> end epoch for the annealing (gan weight reaches the max value)
+    sharp: False --> USMSharp use (sharp ground truth images)
 
 optim:
     weight_decay: 0.01
@@ -73,7 +74,7 @@ optim:
     grad_clip: 1.0 --> clipping gradient for avoiding crashes
 
 data:
-    number_deg: 0/1/2 --> 0: bicubic | 1: downsampling + noise/jpeg (shuffled) | 2: downsampling + noise/jpeg/blur + noise/jpeg/blur (shuffled)
+    number_deg: 0/1 --> 0: bicubic | 1: real-esrgan degradations
     crop_size: --> crops for trainning
     scale: 4
     channels: 3

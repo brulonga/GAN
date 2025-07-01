@@ -30,7 +30,6 @@ def test_model_l2(model, testsets, device, use_wandb, ema):
             if testset_name == 'DIV2K_LSDIR':
 
                 psnr_rgb   = [] ; ssim_rgb = []
-                #psnr_y = [] ; ssim_y = []
 
                 for idx, batch in enumerate(test_dataloader):
 
@@ -46,11 +45,9 @@ def test_model_l2(model, testsets, device, use_wandb, ema):
 
                     psnr_rgb.append(torch.mean(pt_psnr(x, x_hat)).item())
                     ssim_rgb.append(ssim(x, x_hat, data_range=1., size_average=True).item())
-                    #psnr_y.append (get_psnry(x, x_hat).item())
-                    #ssim_y.append (get_ssimy(x, x_hat).item())
 
                     if idx==0:
-                        # Plot only the first image of each test set
+
                         bi = 0
                         _y    = np.clip(y[bi].permute(1,2,0).cpu().detach().numpy(), 0, 1).astype(np.float32)
                         _x_hat= np.clip(x_hat[bi].permute(1,2,0).cpu().detach().numpy(), 0, 1).astype(np.float32)
@@ -61,12 +58,10 @@ def test_model_l2(model, testsets, device, use_wandb, ema):
 
                         del _x, _y,_x_hat; gc.collect()
 
-                ## Log the test metrics:
+
                 if use_wandb:
                     wandb.log({f"{testset_name}_{testset.scale}_psnr": np.mean(psnr_rgb)})
                     wandb.log({f"{testset_name}_{testset.scale}_ssim": np.mean(ssim_rgb)})
-                    #wandb.log({f"{testset_name}_{testset.scale}_PSNR-Y": np.mean(psnr_y)})
-                    #wandb.log({f"{testset_name}_{testset.scale}_SSIM-Y": np.mean(ssim_y)})
 
                 del test_dataloader; gc.collect()
 
@@ -84,7 +79,7 @@ def test_model_l2(model, testsets, device, use_wandb, ema):
                     niqe_list.append(niqe)
 
                     if idx==0:
-                            # Plot only the first image of each test set
+                            
                             bi = 0
                             _y    = np.clip(y[bi].permute(1,2,0).cpu().detach().numpy(), 0, 1).astype(np.float32)
                             _x_hat= np.clip(x_hat[bi].permute(1,2,0).cpu().detach().numpy(), 0, 1).astype(np.float32)
@@ -94,7 +89,6 @@ def test_model_l2(model, testsets, device, use_wandb, ema):
 
                             del _y,_x_hat; gc.collect()
 
-                ## Log the test metrics:
                 if use_wandb:
                     wandb.log({f"{testset_name}_niqe": np.mean(niqe_list)})
 
@@ -102,19 +96,19 @@ def test_model_l2(model, testsets, device, use_wandb, ema):
 
     ema.restore()
 
-def fit_sr_l2(generator, optimizerG, dataloader, device, testsets=None, use_wandb=True, use_amp=True, epochs=100, 
-                  verbose=10, modelname="testmodel", out_path="results/", start_epoch=0, ema_flag = True, clip_value = 1.0):
+def fit_sr_l2(generator, optimizerG, scheduler, dataloader, device, testsets=None, use_wandb=True, use_amp=True, epochs=100, 
+                  verbose=10, modelname="testmodel", out_path="results/", start_epoch=0, ema_flag = True, 
+                  clip_value = 1.0):
 
     steps=0
     use_amp=use_amp
-    nan_batches = 0  # Track NaN batches
+    nan_batches = 0
 
     ema = ExponentialMovingAverage(generator, decay=0.999)
 
     if not os.path.exists(out_path):
         os.makedirs(out_path)
 
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizerG, T_max=epochs, eta_min=1e-5)
     scaler = torch.amp.GradScaler(enabled=use_amp)
 
     for epoch in tqdm(range(start_epoch, start_epoch+epochs), total=start_epoch+epochs):
@@ -126,16 +120,13 @@ def fit_sr_l2(generator, optimizerG, dataloader, device, testsets=None, use_wand
             x = batch[0].to(device, non_blocking=True)
             y = batch[1].to(device, non_blocking=True)
 
-            ########## GENERAR x_hat ##########
             with torch.amp.autocast(device_type='cuda', enabled=use_amp):
                 x_hat = generator(y)['img']
 
             if torch.isnan(x_hat).any() or torch.isinf(x_hat).any():
-                print(f"x_hat contiene NaN o Inf en step {steps}, batch saltado")
+                print(f"x_hat had NaN o Inf in step {steps}, skipt batch")
                 nan_batches += 1
                 continue  
-
-            ########## GENERATOR UPDATE ##########
 
             with torch.amp.autocast(device_type='cuda', enabled=use_amp):
 
@@ -147,10 +138,11 @@ def fit_sr_l2(generator, optimizerG, dataloader, device, testsets=None, use_wand
                 
             if use_amp:
 
-                scaler.scale(loss).backward() 
+                scaler.scale(loss).backward()
+                scaler.unscale_(optimizerG)
                 torch.nn.utils.clip_grad_value_(generator.parameters(), clip_value)
-                scaler.step(optimizerG)  # Update generator weights
-                scaler.update()  # Update the scaler for the next iteration
+                scaler.step(optimizerG)  
+                scaler.update() 
 
                 if ema_flag:
                     ema.update()
@@ -191,41 +183,8 @@ def fit_sr_l2(generator, optimizerG, dataloader, device, testsets=None, use_wand
 
                 del _x, _y,_x_hat; gc.collect()
             
-            print('Epoca completada')
-
-            ##### Evaluate model
+            print('Completed epoch')
             test_model_l2(generator, testsets, device, use_wandb, ema)
-
-            ##### Save Model
-            torch.save(generator.state_dict(), os.path.join(out_path, f"{modelname}_{epoch}.pt"))
+            torch.save(generator.state_dict(), os.path.join(out_path, f"{modelname}.pt"))
             
             gc.collect()
-        
-        #torch.save(model.state_dict(), os.path.join(out_path, f"{modelname}_{epoch}.pt"))
-
-    # torch.save(generator.state_dict(), os.path.join(out_path, f"{modelname}_last.pt"))
-    # torch.save(discriminator.state_dict(), os.path.join(out_path, f"{modelname}_discriminator_last.pt"))
-
-                # Handle NaN or Inf Loss
-                # if torch.isnan(loss_d) or torch.isinf(loss_d):
-                #     nan_batches += 1  # Track NaN batches
-                #     print(f"⚠️ Skipping step due to unstable discriminator loss: {loss_d.item()}")
-                #     continue 
-
-                # # Handle NaN or Inf Loss
-                # if torch.isnan(loss_g) or torch.isinf(loss_g):
-                #     nan_batches += 1  # Track NaN batches
-                #     print(f"⚠️ Skipping step due to unstable generator loss: {loss_g.item()}")
-                #     continue 
-
-                # for name, param in generator.named_parameters():
-                #     if param.grad is not None:
-                #         if torch.isnan(param.grad).any() or torch.isinf(param.grad).any():
-                #             print(f"⚠️ NaN or Inf detected in gradient of {name}!")
-                #             continue
-
-                # for name, param in discriminator.named_parameters():
-                #     if param.grad is not None:
-                #         if torch.isnan(param.grad).any() or torch.isinf(param.grad).any():
-                #             print(f"⚠️ NaN or Inf detected in gradient of {name}!")
-                #             continue
