@@ -63,12 +63,15 @@ training:
     end_epoch: --> end epoch for the annealing (gan weight reaches the max value)
     sharp: False --> USMSharp use (sharp ground truth images)
 
+
+#right now only CosinneAnnealing scheduler implemented. No scheduler for the discriminator.
 optim:
     weight_decay: 0.01
     optimizer: "AdamW"
     lr: --> generator learning rate
+    T_max: --> Number of iterations for the scheduler to reach the final lr value
+    eta_min: --> minimum lr for the scheduler
     lr_discriminator: --> discriminator learning rate 
-    beta1: 0.9
     amsgrad: True --> flag to use mixed precision
     eps: 0.00000001
     grad_clip: 1.0 --> clipping gradient for avoiding crashes
