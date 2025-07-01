@@ -193,7 +193,7 @@ if __name__=="__main__":
                 epochs=cfg.training.epochs, verbose=cfg.training.log_freq, use_amp=cfg.optim.amsgrad,
                 modelname=MODEL_NAME, out_path=f"./results/{MODEL_NAME}/", clip_value = cfg.optim.grad_clip, lpips_weight=cfg.training.lpips_weight,
                 gan_weight_max=cfg.training.gan_weight_max, schedulerG = schedulerG, start_epoch=cfg.training.start_epoch, end_epoch= cfg.training.end_epoch,
-                annealing=cfg.training.annealing,
+                annealing=cfg.training.annealing, ema_flag=cfg.training.ema_flag,
                 )
 
         if USE_WANDB:
