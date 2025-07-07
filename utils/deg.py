@@ -3,9 +3,9 @@ import torch.nn.functional as F
 import numpy as np
 import random
 import math
-from basicsr.utils.img_process_util import filter2D
-from basicsr.data.degradations import random_mixed_kernels, circular_lowpass_kernel
-from basicsr.data.degradations import random_add_gaussian_noise_pt, random_add_poisson_noise_pt
+from utils.basicsr.img_process_util import filter2D
+from utils.basicsr.degradations import random_mixed_kernels, circular_lowpass_kernel
+from utils.basicsr.degradations import random_add_gaussian_noise_pt, random_add_poisson_noise_pt
 
 def modcrop(img_in, scale=4):
     # img_in: Numpy, HWC or HW

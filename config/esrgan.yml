@@ -6,38 +6,36 @@ wandb:
 
 training:
     only_l2: False
-    batch_size: 16
-    epochs: 1000
-    log_freq: 20
+    batch_size: 
+    epochs: 
+    log_freq: 
     lpips_weight: 1.0
     gan_weight_max: 0.1
     annealing: True
-    start_epoch: 5
-    end_epoch: 10
+    start_epoch: 
+    end_epoch: 
     sharp: False
     ema_flag: False
 
 optim:
     weight_decay: 0.001
     optimizer: "AdamW"
-    lr: 0.0002
-    T_max: 52500
-    eta_min: 0.0000001
-    lr_discriminator: 0.00005
+    lr: 
+    T_max: 
+    eta_min: 
+    lr_discriminator: 
     amsgrad: True
     eps: 0.00000001
     grad_clip: 1.0
 
 data:
-    number_deg: 1
-    crop_size: 256
+    number_deg: 
+    crop_size:
     scale: 4
     channels: 3
     debug: -1 # -1 No debugging, N number of debugging samples
-    num_workers: 18
-    ssl_datasets: [
-                    "/mnt/valab-datasets/SuperRes_datasets/PSNR_DATASETS/DIV2K/GT/train"
-                    ]
+    num_workers: 
+    ssl_datasets: []
 generator:
     pick : 0
     models:
@@ -49,7 +47,7 @@ generator:
             scale: 4
             num_intermediate_ch: 32
             num_blocks: 23
-            ckpt: "/home/brulon/Documents/ESRGAN/model_zoo/esrgan_l2.pt"
+            ckpt: 
 
 discriminator:
     pick : 0
@@ -58,4 +56,4 @@ discriminator:
             model: "discriminator"
             in_ch: 3
             num_feat: 64
-            ckpt: #"/scratch/cidaut_tic_1/cidaut_tic_1_7/Repositories/GAN/results/esrgan_161020/esrgan_161020_discriminator.pt"
+            ckpt: 

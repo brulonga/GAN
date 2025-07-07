@@ -14,7 +14,8 @@ from utils.utils import dict2namespace, seed_everything
 from data.datasets import SSLSRImage, SRSSLDTS, SRSUPDTS, SRNRIQADTS
 from scripts.train import fit_sr
 from scripts.train_l2 import fit_sr_l2
-from basicsr.utils import DiffJPEG, USMSharp
+from utils.basicsr.img_process_util import USMSharp
+from utils.basicsr.diffjpeg import DiffJPEG
 
 if __name__=="__main__":
 
