@@ -88,8 +88,10 @@ class SSLSRImage(Dataset):
         assert not torch.isnan(deg_image).any(), f"NaN in deg_image {img_path}"
 
         if self.sharp:
-
+            
+            image = image.unsqueeze(0)
             image = self.usm_sharp(image)
+            image = image.squeeze(0)
 
         image = torch.clamp(image, 0., 1.)
         deg_image = torch.clamp(deg_image, 0., 1.)
