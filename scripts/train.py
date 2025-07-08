@@ -12,12 +12,14 @@ from utils.metrics import pt_psnr, get_psnry, get_ssimy
 from pytorch_msssim import ssim
 from utils.loss import GeneratorLoss, DiscriminatorLoss, ExponentialMovingAverage
 
-def test_model(model, testsets, device, use_wandb, ema):
+def test_model(model, testsets, device, use_wandb, ema, ema_flag = True):
 
     print ("Testing model ...")
 
     model.eval()
-    ema.apply_shadow()
+
+    if ema_flag:
+        ema.apply_shadow()
 
     with torch.no_grad():
 
@@ -90,8 +92,8 @@ def test_model(model, testsets, device, use_wandb, ema):
                     wandb.log({f"{testset_name}_niqe": np.mean(niqe_list)})
 
                 del test_dataloader; gc.collect()
-
-    ema.restore()
+    if ema_flag:
+        ema.restore()
 
 def fit_sr (generator, discriminator, optimizerG, optimizerD, dataloader, device, testsets=None, use_wandb=True, use_amp=True, epochs=100, 
                   verbose=10, modelname="testmodel", out_path="results/", start_epoch=0, ema_flag = True, clip_value = 1.0, lpips_weight = 1.0, gan_weight_max = 1.0,
@@ -204,7 +206,7 @@ def fit_sr (generator, discriminator, optimizerG, optimizerD, dataloader, device
             
             print('Epoch completed')
 
-            test_model(generator, testsets, device, use_wandb, ema)
+            test_model(generator, testsets, device, use_wandb, ema, ema_flag)
             torch.save(generator.state_dict(), os.path.join(out_path, f"{modelname}.pt"))
             torch.save(discriminator.state_dict(), os.path.join(out_path, f"{modelname}_discriminator.pt"))
             
