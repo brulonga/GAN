@@ -14,8 +14,7 @@ from utils.utils import dict2namespace, seed_everything
 from data.datasets import SSLSRImage, SRSSLDTS, SRSUPDTS, SRNRIQADTS
 from scripts.train import fit_sr
 from scripts.train_l2 import fit_sr_l2
-from utils.basicsr.img_process_util import USMSharp
-from utils.basicsr.diffjpeg import DiffJPEG
+from basicsr.utils import DiffJPEG, USMSharp
 
 if __name__=="__main__":
 
@@ -161,6 +160,7 @@ if __name__=="__main__":
     optimizerG = torch.optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr=cfg.optim.lr, weight_decay=cfg.optim.weight_decay)
 
     schedulerG = torch.optim.lr_scheduler.CosineAnnealingLR(optimizerG, T_max=cfg.optim.T_max ,eta_min=cfg.optim.eta_min)
+    schedulerD = torch.optim.lr_scheduler.CosineAnnealingLR(optimizerD, T_max=cfg.optim.T_max_d, eta_min=cfg.optim.eta_min_d)
 
     torch.cuda.empty_cache()
     torch.cuda.reset_peak_memory_stats()
@@ -194,7 +194,8 @@ if __name__=="__main__":
                 epochs=cfg.training.epochs, verbose=cfg.training.log_freq, use_amp=cfg.optim.amsgrad,
                 modelname=MODEL_NAME, out_path=f"./results/{MODEL_NAME}/", clip_value = cfg.optim.grad_clip, lpips_weight=cfg.training.lpips_weight,
                 gan_weight_max=cfg.training.gan_weight_max, schedulerG = schedulerG, start_epoch=cfg.training.start_epoch, end_epoch= cfg.training.end_epoch,
-                annealing=cfg.training.annealing, ema_flag=cfg.training.ema_flag,
+                annealing=cfg.training.annealing, ema_flag=cfg.training.ema_flag, relativistic=cfg.training.relativistic, l1_weight=cfg.training.l1_weight,
+                schedulerD = schedulerD,
                 )
 
         if USE_WANDB:

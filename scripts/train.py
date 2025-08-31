@@ -67,7 +67,15 @@ def test_model(model, testsets, device, use_wandb, ema, ema_flag = True):
             else:
                 
                 niqe_list = []
+                ma_list = []
+                clipiqa_list = []
+                maniqa_list = []
+                pi_list = []
+                
                 niqe_model = pyiqa.create_metric('niqe').eval().to(device)
+                ma_model = pyiqa.create_metric('nrqm').eval().cuda()
+                clipiqa_model = pyiqa.create_metric('clipiqa').eval().cuda()
+                maniqa_model = pyiqa.create_metric('maniqa').eval().cuda()      
 
                 for idx, batch in enumerate(test_dataloader):
 
@@ -77,8 +85,20 @@ def test_model(model, testsets, device, use_wandb, ema, ema_flag = True):
                     niqe =  niqe_model(x_hat).item()
                     niqe_list.append(niqe)
 
+                    ma = ma_model(x_hat).item()
+                    ma_list.append(ma)  
+
+                    clipiqa = clipiqa_model(x_hat).item()
+                    clipiqa_list.append(clipiqa)
+
+                    maniqa = maniqa_model(x_hat).item()
+                    maniqa_list.append(maniqa)
+
+                    pi = 0.5 * ((10-ma)+niqe)
+                    pi_list.append(pi)
+
                     if idx==0:
-            
+
                             bi = 0
                             _y    = np.clip(y[bi].permute(1,2,0).cpu().detach().numpy(), 0, 1).astype(np.float32)
                             _x_hat= np.clip(x_hat[bi].permute(1,2,0).cpu().detach().numpy(), 0, 1).astype(np.float32)
@@ -90,6 +110,10 @@ def test_model(model, testsets, device, use_wandb, ema, ema_flag = True):
 
                 if use_wandb:
                     wandb.log({f"{testset_name}_niqe": np.mean(niqe_list)})
+                    wandb.log({f"{testset_name}_ma": np.mean(ma_list)})
+                    wandb.log({f"{testset_name}_clipiqa": np.mean(clipiqa_list)})
+                    wandb.log({f"{testset_name}_maniqa": np.mean(maniqa_list)})
+                    wandb.log({f"{testset_name}_pi": np.mean(pi_list)})
 
                 del test_dataloader; gc.collect()
     if ema_flag:
@@ -97,7 +121,7 @@ def test_model(model, testsets, device, use_wandb, ema, ema_flag = True):
 
 def fit_sr (generator, discriminator, optimizerG, optimizerD, dataloader, device, testsets=None, use_wandb=True, use_amp=True, epochs=100, 
                   verbose=10, modelname="testmodel", out_path="results/", start_epoch=0, ema_flag = True, clip_value = 1.0, lpips_weight = 1.0, gan_weight_max = 1.0,
-                  schedulerG = None, end_epoch= 1000, annealing = False):
+                  schedulerG = None, end_epoch= 1000, annealing = False, relativistic = True, l1_weight = 1.0, schedulerD = None):
 
     steps=0
     use_amp=use_amp
@@ -105,8 +129,8 @@ def fit_sr (generator, discriminator, optimizerG, optimizerD, dataloader, device
 
     ema = ExponentialMovingAverage(generator, decay=0.999)
 
-    loss_g = GeneratorLoss(lpips_weight= lpips_weight, gan_weight_max=gan_weight_max, end_epoch=end_epoch, start_epoch=start_epoch)
-    loss_d = DiscriminatorLoss(discriminator=discriminator)
+    loss_g = GeneratorLoss(l1_weight=l1_weight, lpips_weight= lpips_weight, gan_weight_max=gan_weight_max, end_epoch=end_epoch, start_epoch=start_epoch, relativistic=relativistic)
+    loss_d = DiscriminatorLoss(discriminator=discriminator, relativistic=relativistic)
 
     if not os.path.exists(out_path):
         os.makedirs(out_path)
@@ -138,7 +162,13 @@ def fit_sr (generator, discriminator, optimizerG, optimizerD, dataloader, device
 
                 optimizerG.zero_grad(set_to_none=True)
                 fake_pred_disc_for_gen = discriminator(x_hat)['out']
-                loss_gen, dict_losses = loss_g(x_hat, x, fake_pred_disc_for_gen, epoch, annealing=annealing)
+
+                if relativistic:
+                    real_pred_disc_for_gen = discriminator(x)['out']
+                else:
+                    real_pred_disc_for_gen = None
+                
+                loss_gen, dict_losses = loss_g(x_hat, x, fake_pred_disc_for_gen, real_pred_disc_for_gen, epoch, annealing=annealing)
 
                 if use_amp:
                     scaler.scale(loss_gen.mean()).backward()
@@ -159,7 +189,10 @@ def fit_sr (generator, discriminator, optimizerG, optimizerD, dataloader, device
                 optimizerD.zero_grad(set_to_none=True)
                 x_hat_detached = x_hat.detach()
                 fake_pred_disc_for_disc = discriminator(x_hat_detached)['out']
-                loss_disc, loss_d_fake, loss_d_real = loss_d(fake_pred_disc_for_disc, x)
+
+                real_pred_disc_for_disc = discriminator(x)['out']
+
+                loss_disc, loss_d_fake, loss_d_real = loss_d(fake_pred_disc_for_disc, real_pred_disc_for_disc)
 
                 if use_amp:
                     scaler.scale(loss_disc.mean()).backward()
@@ -184,6 +217,7 @@ def fit_sr (generator, discriminator, optimizerG, optimizerD, dataloader, device
                 wandb.log({"Real_disc_loss": loss_d_real.mean().item()})
             
         schedulerG.step()
+        schedulerD.step()
 
         if nan_batches >= 10: 
             print ("Training collapses")
@@ -206,7 +240,7 @@ def fit_sr (generator, discriminator, optimizerG, optimizerD, dataloader, device
             
             print('Epoch completed')
 
-            test_model(generator, testsets, device, use_wandb, ema, ema_flag)
+            test_model(generator, testsets, device, use_wandb, ema, ema_flag=ema_flag)
             torch.save(generator.state_dict(), os.path.join(out_path, f"{modelname}.pt"))
             torch.save(discriminator.state_dict(), os.path.join(out_path, f"{modelname}_discriminator.pt"))
             

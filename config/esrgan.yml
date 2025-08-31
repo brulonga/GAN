@@ -6,36 +6,43 @@ wandb:
 
 training:
     only_l2: False
-    batch_size: 
-    epochs: 
-    log_freq: 
-    lpips_weight: 1.0
+    batch_size: 8
+    epochs: 100
+    log_freq: 10
+    l1_weight: 1
+    lpips_weight: 0.0
     gan_weight_max: 0.1
     annealing: True
-    start_epoch: 
-    end_epoch: 
-    sharp: False
+    start_epoch: 0
+    end_epoch: 10
+    sharp: True
     ema_flag: False
+    relativistic: True
 
 optim:
-    weight_decay: 0.001
+    weight_decay: 0.0001
     optimizer: "AdamW"
-    lr: 
-    T_max: 
-    eta_min: 
-    lr_discriminator: 
-    amsgrad: True
-    eps: 0.00000001
+    lr: 0.0001
+    T_max: 90
+    eta_min: 0.0000001
+    lr_discriminator: 0.00001 
+    T_max_d: 90
+    eta_min_d: 0.00000001
+    amsgrad: True 
     grad_clip: 1.0
+    
 
 data:
-    number_deg: 
-    crop_size:
+    number_deg: 1
+    crop_size: 128
     scale: 4
     channels: 3
     debug: -1 # -1 No debugging, N number of debugging samples
-    num_workers: 
-    ssl_datasets: []
+    num_workers: 8
+    ssl_datasets: [
+                    "/mnt/valab-datasets/SuperRes_datasets/PSNR_DATASETS/DIV2K/GT/train",
+                    #"/mnt/valab-datasets/SuperRes_datasets/PSNR_DATASETS/FLICK2K/GT/train"
+                    ]
 generator:
     pick : 0
     models:
@@ -47,7 +54,7 @@ generator:
             scale: 4
             num_intermediate_ch: 32
             num_blocks: 23
-            ckpt: 
+            ckpt: "./model_zoo/esrgan_l2.pt"
 
 discriminator:
     pick : 0
@@ -56,4 +63,4 @@ discriminator:
             model: "discriminator"
             in_ch: 3
             num_feat: 64
-            ckpt: 
+            ckpt: # "./model_zoo/esrgan_081935_discriminator.pt"

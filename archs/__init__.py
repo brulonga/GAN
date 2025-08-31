@@ -55,7 +55,7 @@ def make_discriminator (cfg, device):
     model = model.to(device)
     model.eval()
     with torch.no_grad():
-        input_fake = torch.rand(1, 3, 4*960, 4*540).to(device)
+        input_fake = torch.rand(1, 3, 256, 256).to(device)
         flops = FlopCountAnalysis(model, input_fake).total()
 
     nparams_hot   = count_params (model.eval())

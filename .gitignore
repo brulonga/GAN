@@ -2,3 +2,4 @@ __pycache__/
 wandb/
 venv_GAN/
 run.sh
+model_zoo/
