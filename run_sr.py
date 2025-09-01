@@ -36,7 +36,7 @@ if __name__=="__main__":
     CONFIG     = args.config
     TEST_CFG   = args.test
     
-    MODEL_NAME += "_" + datetime.now().strftime("%d%H%M")
+    # MODEL_NAME += "_" + datetime.now().strftime("%d%H%M")
 
     torch.cuda.set_device(f'cuda:{GPU}')
     device = torch.device(f'cuda:{GPU}' if torch.cuda.is_available() else "cpu")

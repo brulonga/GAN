@@ -1,0 +1,68 @@
+wandb:
+    use: True
+    project: "GANs"
+    entity : "cidautai"
+    tags   : ["sr"]
+
+training:
+    only_l2: False
+    batch_size: 8
+    epochs: 1000
+    log_freq: 20
+    l1_weight: 1
+    lpips_weight: 0.5
+    gan_weight_max: 0.15
+    annealing: False
+    start_epoch: 0
+    end_epoch: 10
+    sharp: True
+    ema_flag: False
+    relativistic: False
+
+optim:
+    weight_decay: 0.0001
+    optimizer: "AdamW"
+    lr: 0.00005
+    T_max: 900
+    eta_min: 0.0000001
+    lr_discriminator: 0.000005 
+    T_max_d: 900
+    eta_min_d: 0.00000001
+    amsgrad: False 
+    grad_clip: 1.0
+    
+
+data:
+    number_deg: 1
+    crop_size: 256
+    scale: 4
+    channels: 3
+    debug: -1 # -1 No debugging, N number of debugging samples
+    num_workers: 8
+    ssl_datasets: [
+                    # "/home/brulon/Imágenes/DIV2K/DIV2K_train_HR",
+                    "/scratch/cidaut_tic_1/cidaut_tic_1_7/Datasets/DIV2K/GT/train",
+                    # "/mnt/valab-datasets/SuperRes_datasets/PSNR_DATASETS/DIV2K/GT/train",
+                    #"/mnt/valab-datasets/SuperRes_datasets/PSNR_DATASETS/FLICK2K/GT/train"
+                    ]
+generator:
+    pick : 0
+    models:
+        -   arch: "esrgan"
+            model: "generator"
+            in_ch: 3
+            out_ch: 3
+            num_feat: 64
+            scale: 4
+            num_intermediate_ch: 32
+            num_blocks: 23
+            ckpt: "./results/esrgan_stg1/esrgan_stg1.pt"
+
+discriminator:
+    pick : 0
+    models:
+        -   arch: "spectralunet"
+            model: "discriminator"
+            in_ch: 3
+            num_feat: 64
+            ckpt: "./results/esrgan_stg1/esrgan_stg1_discriminator.pt"

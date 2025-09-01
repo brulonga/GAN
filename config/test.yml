@@ -1,10 +1,10 @@
 test:
-    - DIV2K_LSDIR:
-        hr: "/mnt/valab-datasets/SuperRes_datasets/PSNR_DATASETS/DIV2K_LSDIR/GT/validation"
-        lr: "/mnt/valab-datasets/SuperRes_datasets/PSNR_DATASETS/DIV2K_LSDIR/bicubic/validation"
+    - DIV2K:
+        hr: "/scratch/cidaut_tic_1/cidaut_tic_1_7/Datasets/DIV2K/GT/validation" # "/home/brulon/Imágenes/DIV2K/DIV2K_valid_HR" | "/mnt/valab-datasets/SuperRes_datasets/PSNR_DATASETS/DIV2K_LSDIR/GT/validation" | "/scratch/cidaut_tic_1/cidaut_tic_1_7/Datasets/DIV2K/GT/validation"
+        lr: "/scratch/cidaut_tic_1/cidaut_tic_1_7/Datasets/DIV2K/LR/validation" # "/home/brulon/Imágenes/DIV2K/DIV2K_valid_LR_bicubic_X4" | "/mnt/valab-datasets/SuperRes_datasets/PSNR_DATASETS/DIV2K_LSDIR/bicubic/validation" | "/scratch/cidaut_tic_1/cidaut_tic_1_7/Datasets/DIV2K/LR/validation"
         n: 200
         scale: 4
 
     - RealSRSet:
-        lr: "/mnt/valab-datasets/SuperRes_datasets/PERCEPTUAL_DATASETS/RealSRSet"
+        lr: "/scratch/cidaut_tic_1/cidaut_tic_1_7/Datasets/RealSRSet" # "/home/brulon/Imágenes/RealSRSet" | "/mnt/valab-datasets/SuperRes_datasets/PERCEPTUAL_DATASETS/RealSRSet" | "/scratch/cidaut_tic_1/cidaut_tic_1_7/Datasets/RealSRSet"
         n: 20
